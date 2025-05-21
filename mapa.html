@@ -1,29 +1,115 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <title>Mapa com Leaflet</title>
-  <meta charset="utf-8" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-  <style>
-    #map { height: 600px; width: 100%; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mapa FMD - Visualização de Dados</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body, html { margin: 0; padding: 0; height: 100%; font-family: Arial, sans-serif; }
+        #map { width: 100%; height: 100vh; }
+        .info-panel {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            max-width: 300px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .feature-info { margin-bottom: 10px; }
+        .feature-info h3 { margin-top: 0; color: #2c3e50; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+        .feature-info p { margin: 5px 0; }
+        .feature-info strong { color: #3498db; }
+    </style>
 </head>
 <body>
-  <div id="map"></div>
-  <script>
-    var map = L.map('map').setView([-23.55, -46.63], 12); // coordenadas iniciais
+    <div id="map"></div>
+    <div class="info-panel" id="infoPanel">
+        <h2>Dados FMD</h2>
+        <div id="featureInfo">Clique em um ponto no mapa para ver detalhes</div>
+    </div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([-23.5505, -46.6333], 11);
 
-    // Carrega o seu arquivo GeoJSON
-    fetch('Linhas_FMD.geojson')
-  .then(res => res.json())
-  .then(data => {
-    L.geoJSON(data).addTo(map);
-  });
-  </script>
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        function formatMoney(value) {
+            if (!value || typeof value !== 'string') return 'N/A';
+            return value.trim();
+        }
+
+        fetch("https://raw.githubusercontent.com/BobZ96/MapaFMD/main/Linhas_FMD.geojson")
+            .then(response => {
+                if (!response.ok) throw new Error("Erro ao carregar o GeoJSON");
+                return response.json();
+            })
+            .then(geojsonData => {
+                const geoJsonLayer = L.geoJSON(geojsonData, {
+                    pointToLayer: (feature, latlng) => {
+                        return L.circleMarker(latlng, {
+                            radius: 8,
+                            fillColor: '#e74c3c',
+                            color: '#c0392b',
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: (feature, layer) => {
+                        const props = feature.properties;
+                        const popupContent = `<div class="feature-info">
+                            <h3>${props.Endereço || 'Localização'}</h3>
+                            <p><strong>Ano:</strong> ${props.Ano || 'N/A'}</p>
+                            <p><strong>Unidade:</strong> ${props.Unidade || 'N/A'}</p>
+                            <p><strong>Valor Empenho:</strong> ${formatMoney(props["Valor Empenho"])}</p>
+                        </div>`;
+                        layer.bindPopup(popupContent, { maxWidth: 300 });
+
+                        layer.on('click', () => {
+                            const infoContent = `
+                                <div class="feature-info">
+                                    <h3>Detalhes do Projeto</h3>
+                                    <p><strong>Equipamento:</strong> ${props["Equipamento 2"] || 'N/A'}</p>
+                                    <p><strong>Tipo:</strong> ${props["Equipamento 1"] || 'N/A'}</p>
+                                    <p><strong>Endereço:</strong> ${props.Endereço || 'N/A'}</p>
+                                    <p><strong>Região:</strong> ${props.Região || 'N/A'}</p>
+                                    <p><strong>Extensão:</strong> ${props["Extensão (m)"] || 'N/A'} metros</p>
+                                    <p><strong>Trecho:</strong> ${props["Trecho (Recap)"] || 'N/A'}</p>
+                                    <hr>
+                                    <h4>Informações Orçamentárias</h4>
+                                    <p><strong>Função:</strong> ${props["Função"] || 'N/A'}</p>
+                                    <p><strong>Sub Função:</strong> ${props["Sub Função"] || 'N/A'}</p>
+                                    <p><strong>Programa:</strong> ${props["Programa"] || 'N/A'}</p>
+                                    <p><strong>Atividade:</strong> ${props["Atividade"] || 'N/A'}</p>
+                                    <p><strong>Valor Empenho:</strong> ${formatMoney(props["Valor Empenho"])}</p>
+                                    <p><strong>Valor Liquidado:</strong> ${formatMoney(props["Valor Empenho Liquidado"])}</p>
+                                    <p><strong>Valor Cancelado:</strong> ${formatMoney(props["Valor Empenho Cancelado"])}</p>
+                                    <hr>
+                                    <h4>Detalhes do Processo</h4>
+                                    <p><strong>Processo SEI:</strong> ${props["Processo SEI"] || 'N/A'}</p>
+                                    <p><strong>Unidade:</strong> ${props["Unidade"] || 'N/A'}</p>
+                                    <p><strong>Contrato:</strong> ${props.Contrato || 'N/A'}</p>
+                                    <p><strong>Credor:</strong> ${props["Credor Nome"] || 'N/A'}</p>
+                                </div>`;
+                            document.getElementById('featureInfo').innerHTML = infoContent;
+                        });
+                    }
+                });
+                geoJsonLayer.addTo(map);
+            })
+            .catch(error => {
+                console.error('Erro ao carregar o GeoJSON:', error);
+                document.getElementById('featureInfo').innerHTML = '<p style="color: red;">Erro ao carregar dados geográficos.</p>';
+            });
+    </script>
 </body>
 </html>
